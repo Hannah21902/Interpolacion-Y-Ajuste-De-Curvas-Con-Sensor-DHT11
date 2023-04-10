@@ -1,0 +1,65 @@
+//Arduino datalogger con SD Card e DHT-11 per memorizzare 
+//i dati di temperatura e umidità su SD Card.
+//Per maggiori info: www.progettiarduino.com
+
+// Libreria del sensor de temperatura y humedad DHT11. Funciona para otros modelos DHT.
+#include <DHT.h>  
+//Librerias para el modulo SD.
+#include <SPI.h>
+#include <SD.h>
+
+// Variables generales
+int DHTPIN = 8; // Senal del Sensor DHT11
+const int chipSelect = 4; // Senal del modulo SD
+int cont = 0;
+#define DHTTYPE DHT11   // DHT 11
+
+DHT dht(DHTPIN, DHTTYPE); //Configuracion inicial del modulo SD
+
+
+void setup() {
+  // Inicializacion del monitor serial.
+  Serial.begin(9600);
+  while (!Serial) {
+    ; // Attendere l`apertura della comunicazione seriale
+  }
+  // Confirmamos el funcionamiento de la tarjeta SD
+  dht.begin();
+
+  Serial.print("Inicializando tarjeta SD...");
+
+  // Se la card è presente inizia
+  if (!SD.begin(chipSelect)) {
+    Serial.println("ERROR!. No se encontro la tarjeta SD.");
+    // non eseguire più il codice
+    return;
+  }
+  Serial.println("Tarjeta SD lista.");
+}
+
+void loop() {
+  // crea una stringa per assemblare i dati di log
+  String dataString = "";
+
+  //Variables para las lecturas del sensor
+  float h = dht.readHumidity(false);
+  float t = dht.readTemperature(false); // true= fahrenheit   false= celsius
+  
+  // Aprire il file. Da notare che puòessere apertoun solo file alla volta,
+  // quindi bisogna chiudere questa prima di aprirne un'altra.
+  File dataFile = SD.open("datalog2.txt", FILE_WRITE);
+
+  // Se è presente il file, scrivi su i millisecondi,umidità, temperatura:
+  if (dataFile) {
+    dataFile.println(String(cont)+","+String(t)+","+String(h));
+    dataFile.close();
+    // Scrivi sul monitor seriale i millisecondi,umidità, temperatura:
+    Serial.println(String(cont)+","+String(t)+","+String(h));
+    delay(60000);  // Ogni 1 secondi
+  }
+  // Se il file non è aperto, scrivi sul monitor seriale:
+  else {
+    Serial.println("ERROR!. En la apertura del archivo datalog2.txt");
+  }
+  cont++;
+}
