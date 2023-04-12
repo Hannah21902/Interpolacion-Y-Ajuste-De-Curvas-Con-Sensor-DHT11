@@ -1,0 +1,131 @@
+# LIBRERIAS
+# Importamos librerías necesarias para realizar operaciones matemáticas, visualizaciones gráficas, interpolación y montar nuestra unidad de Drive.
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy import interpolate
+from google.colab import drive
+
+#_______________________________________________________________________________________________________________________________________
+
+
+#_______________________________________________________________________________________________________________________________________
+# DATOS
+# En la sección de datos, se importan los datos de temperatura y humedad desde una archivo CSV almacenado en Google Drive. Estos datos se almacenan en las matrices tiempos, temperaturas y humedad.
+
+drive.mount('/content/drive') # Importamos datos de drive
+
+
+data_path = '/content/drive/My Drive/Proyecto_DHT11/' # Ruta de los datos
+
+# Cargamos los datos de temperatura, tiempo y humedad desde un archivo csv usando la función loadtxt de numpy
+# skiprows=1 ignora la primera fila del archivo que contiene el nombre de las columnas
+# unpack=True permite separar las tres columnas en tres arreglos diferentes
+tiempos, temperaturas, humedad = np.loadtxt(data_path + 'set_datos_DHT11.csv', delimiter=';', skiprows=1, unpack=True) #Datos reales
+
+
+  # En esta sección se definen los máximos y mínimos de temperatura y humedad, obtenidos de forma manual. Se crean dos arrays, "tiempo_t" y "tiempo_h", 
+  # que contienen los valores del tiempo correspondientes a los valores de temperatura y humedad, respectivamente. También se crean dos arrays, "t" y "h", que contienen los valores de temperatura y humedad.
+# Maximos y minimos de temperatura
+tiempo_t = np.array([0, 169, 279, 497, 664, 736, 789, 1091, 1147])
+t = np.array([25.7, 26.9, 26.7, 27.4, 26.4, 26.9, 26.7, 27.2, 27.1])
+
+# Maximos y minimos de humedad
+tiempo_h = np.array([0,92, 303, 535, 607, 747, 829, 876, 976, 1143, 1206])
+h = np.array([78, 85, 69, 77, 68, 87, 70, 80, 70, 77, 70])
+#_______________________________________________________________________________________________________________________________________
+
+
+# INTERPOLACION
+
+# Interpolación de la temperatura
+arr_t = np.arange(np.amin(tiempo_t), np.amax(tiempo_t), 0.01)  # Se crea un array de tiempo para la temperatura desde el tiempo mínimo al máximo, en incrementos de 0.01
+st = interpolate.CubicSpline(tiempo_t, t, bc_type='natural')  # Se realiza la interpolación cúbica natural para la temperatura
+coeficientes_t = st.c  # Se obtienen los coeficientes de la función interpolada de la temperatura
+
+# Interpolación de la humedad
+arr_h = np.arange(np.amin(tiempo_h), np.amax(tiempo_h), 0.01)  # Se crea un array de tiempo para la humedad desde el tiempo mínimo al máximo, en incrementos de 0.01
+sh = interpolate.CubicSpline(tiempo_h, h, bc_type='natural')  # Se realiza la interpolación cúbica natural para la humedad
+coeficientes_h = sh.c  # Se obtienen los coeficientes de la función interpolada de la humedad
+
+# FUNCIONES EN FORMA ALGEBRAICA
+
+# Mostramos las funciones algebraicas de cada segmento de la curva - Temperatura
+print(' FUNCIONES DE TEMPERATURA \n')
+for i in range(len(tiempo_t)-1):
+    # Se muestran las funciones algebraicas de cada segmento de la curva de la temperatura segun la forma indicada en la documentacion de la funcion interpolate.CubicSpline
+    print(f"Función algebraica del segmento {i}: {coeficientes_t[0, i]:0.8f}(x - {tiempo_t[i]})^3 + {coeficientes_t[1, i]:0.5f}(x - {tiempo_t[i]})^2 + {coeficientes_t[2, i]:0.3f}(x - {tiempo_t[i]}) + ({coeficientes_t[3, i]:0.2f})\n")
+
+# Mostramos las funciones algebraicas de cada segmento de la curva - Humedad
+print(' FUNCIONES DE HUMEDAD \n')
+for u in range(len(tiempo_h)-1):
+    # Se muestran las funciones algebraicas de cada segmento de la curva de la humedad segun la forma indicada en la documentacion de la funcion interpolate.CubicSpline
+    print(f"Función algebraica del segmento {u}: {coeficientes_h[0, u]:0.8f}(x - {tiempo_h[u]})^3 + {coeficientes_h[1, u]:0.5f}(x - {tiempo_h[u]})^2 + {coeficientes_h[2, u]:0.3f}(x - {tiempo_h[u]}) + ({coeficientes_h[3, u]:0.2f})\n")
+
+
+# GRAFICAS
+#_______________________________________________________________________________________________________________________________________ 
+
+# Se define una figura y dos subplots (uno para la temperatura y otro para la humedad)
+fig, ax = plt.subplots(2, 1, figsize=(16, 16))
+
+print('GRAFICAS \n')
+
+# GRAFICAS DE TEMPERATURA
+#_______________________________________________________________________________________________________________________________________ 
+
+# Se grafica la temperatura en función del tiempo a partir de los maximos y minimos.
+ax[0].plot(tiempo_t, t, 'bo', label='Data Point')
+
+# Se grafica la spline cúbica resultante
+arr_t = np.linspace(tiempo_t.min(), tiempo_t.max(), 1000)
+ax[0].plot(arr_t, st(arr_t), 'k-', label='Cubic Spline', lw=1)
+
+# Se grafican los datos de temperatura (no interpolados) utilizando puntos rojos
+ax[0].scatter(tiempos, temperaturas, color='red')
+
+# Se agrega una línea punteada que representa cada segmento de la spline cúbica
+for i in range(tiempo_t.shape[0] - 1):
+    # Se genera un array con 100 puntos equidistantes para cada segmento
+    segment_x = np.linspace(tiempo_t[i], tiempo_t[i + 1], 100)
+    
+    # Se crea un array de (4, 100), donde cada fila corresponde a (x - x[i])**3, (x - x[i])**2, etc.
+    exp_x = (segment_x - tiempo_t[i])[None, :] ** np.arange(4)[::-1, None]
+    
+    # Se multiplica el array exp_x por los coeficientes de la i-ésima columna de la spline cúbica y se suman las filas
+    segment_y = st.c[:, i].dot(exp_x)
+    
+    # Se grafica el segmento
+    ax[0].plot(segment_x, segment_y, label='Segment {}'.format(i), ls='--', lw=3)
+
+
+ax[0].legend(loc='lower right') # Se agrega la leyenda al subplot de la temperatura
+
+# Se agrega el título y los labels de los ejes al subplot de la temperatura
+ax[0].set_ylabel('Temperatura(°C)')
+ax[0].set_xlabel('Tiempo(minutos)')
+ax[0].set_title('Temperatura(°C) vs Tiempo(minutos)')
+
+
+# GRAFICAS DE HUMEDAD
+# Para esta seccion se suige el mismo procedimiento que se utilizo para encontrar la forma grafica de los datos de temperatura, pero en este caso para la humedad.
+#_______________________________________________________________________________________________________________________________________ 
+ax[1].plot(tiempo_h, h, 'bo', label='Data Point')
+ax[1].plot(arr_h, sh(arr_h), 'k-', label='Cubic Spline', lw=1)
+ax[1].scatter(tiempos, humedad)
+
+for u in range(tiempo_h.shape[0] - 1):
+    segment_x = np.linspace(tiempo_h[u], tiempo_h[u + 1], 100)
+    # A (4, 100) array, where the rows contain (x-x[i])**3, (x-x[i])**2 etc.
+    exp_x = (segment_x - tiempo_h[u])[None, :] ** np.arange(4)[::-1, None]
+    # Sum over the rows of exp_x weighted by coefficients in the ith column of s.c
+    segment_y = sh.c[:, u].dot(exp_x)
+    ax[1].plot(segment_x, segment_y, label='Segment {}'.format(u), ls='--', lw=3)
+
+ax[1].legend(loc='lower right')
+ax[1].set_ylabel('Humedad(%)')
+ax[1].set_xlabel('Tiempo(minutos)')
+ax[1].set_title('Humedad(%) vs Tiempo(minutos)')
+
+fig.suptitle('Graficas de Temperatura y Humedad vs Tiempo', fontsize=16) # Titulo del arreglo de graficas
+fig.tight_layout()  # Espaciamiento automatico entre graficas
+plt.show()
